@@ -1,42 +1,35 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <title>Legal Acts Portal</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <style>
-    body { max-width: 600px; margin: 20px auto; font-family: Arial; }
-    input, button, select { padding: 8px; margin: 5px 0; width: 100%; }
-    #docs { margin-top: 20px; }
-    .doc { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-    .admin-buttons button { margin-right: 5px; }
-  </style>
-</head>
-<body>
+<input type="file" id="fileInput" />
+<button id="uploadBtn">Загрузить файл</button>
 
-  <div id="userInfo"></div>
-  <input id="email" placeholder="Логин (например 12345-12345)" />
-  <input id="password" type="password" placeholder="Пароль" />
-  <button id="loginBtn">Войти</button>
-  <button id="logoutBtn" style="display:none">Выйти</button>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+  import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-storage.js";
 
-  <section id="uploadSection" style="display:none">
-    <h2>Загрузка документа</h2>
-    <input id="fio" placeholder="ФИО (3 слова)" />
-    <select id="docType">
-      <option value="Постановление">Постановление</option>
-      <option value="Указ">Указ</option>
-    </select>
-    <input id="department" placeholder="Отдел" />
-    <input type="file" id="fileInput" />
-    <button id="uploadBtn">Загрузить документ</button>
-  </section>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBJX1aiBnBg_dVQ_AOA5L3rsvQyLgIb27E",
+    authDomain: "legal-acts-portal.firebaseapp.com",
+    projectId: "legal-acts-portal",
+    storageBucket: "legal-acts-portal.appspot.com",
+    messagingSenderId: "969951897920",
+    appId: "1:969951897920:web:3e35b87565cfcc9e0832a5"
+  };
 
-  <div id="docs"></div>
+  const app = initializeApp(firebaseConfig);
+  const storage = getStorage(app);
 
-  <script type="module">
-    // Твой вставленный код сюда
-  </script>
-
-</body>
-</html>
+  document.getElementById('uploadBtn').onclick = async () => {
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput.files.length) {
+      alert('Выберите файл');
+      return;
+    }
+    const file = fileInput.files[0];
+    const storageRef = ref(storage, `test_uploads/${file.name}`);
+    try {
+      await uploadBytes(storageRef, file);
+      alert('Файл загружен!');
+    } catch (e) {
+      alert('Ошибка загрузки: ' + e.message);
+    }
+  }
+</script>
