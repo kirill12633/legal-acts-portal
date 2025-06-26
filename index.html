@@ -1,1 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Legal Acts Portal</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { max-width: 600px; margin: auto; font-family: Arial; padding: 20px;}
+    #loginDiv, #appDiv {display: none;}
+    #qrcode { margin-top: 10px; }
+    .doc-item {border: 1px solid #ccc; padding:10px; margin:10px 0;}
+    button { margin-right: 5px; }
+  </style>
+</head>
+<body>
+
+<h1>Портал правовых актов</h1>
+
+<div id="loginDiv">
+  <h3>Вход</h3>
+  <input id="email" type="email" placeholder="Email" /><br><br>
+  <input id="password" type="password" placeholder="Пароль" /><br><br>
+  <button onclick="login()">Войти</button>
+  <p id="loginError" style="color:red;"></p>
+</div>
+
+<div id="appDiv">
+  <button onclick="logout()">Выйти</button>
+  <h3>Загрузить документ</h3>
+  <form id="uploadForm">
+    ФИО: <input type="text" id="fio" required><br><br>
+    Вид (Постановление/Указ): 
+    <select id="docType" required>
+      <option value="">--Выбрать--</option>
+      <option value="Постановление">Постановление</option>
+      <option value="Указ">Указ</option>
+    </select><br><br>
+    Отдел: <input type="text" id="department" required><br><br>
+    Файл: <input type="file" id="fileInput" required><br><br>
+    <button type="submit">Загрузить</button>
+  </form>
+
+  <h3>Документы</h3>
+  <div id="docList"></div>
+</div>
+
+<script>
+  // Твои настройки Firebase сюда:
+  const firebaseConfig = {
+    apiKey: "ТВОЙ_API_KEY",
+    authDomain: "ТВОЙ_ДОМЕН.firebaseapp.com",
+    projectId: "ТВОЙ_PROJECT_ID",
+    storageBucket: "ТВОЙ_ДОМЕН.appspot.com",
+    messagingSenderId: "ТОКЕН",
+    appId: "ID_ПРИЛОЖЕНИЯ"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  const loginDiv = document.getElementById('loginDiv');
+  const appDiv = document.getElementById('appDiv');
+  const loginError = document.getElementById('loginError');
+  const docList = document.getElementById('docList');
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      loginDiv.style.display = 'none';
+      appDiv.style.display = 'block';
+      loadDocuments();
+    } else {
+      loginDiv.style.display = 'block';
+      appDiv.style.display = 'none';
+    }
+  });
+
+  function login() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
+    loginError.textContent = '';
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(e => loginError.textContent = e.message);
+  }
+
+  function logout() {
+    auth.signOut();
+  }
+
+  document.getElementById('uploadForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const fio = document.getElementById('fio').value.trim();
+    const docType = document.getElementById('docType').value;
+    const department = document.getElementById('department').value.trim();
+    const fileInput = document.getElementById('fileInput');
+
+    if (!fileInput.files.length) {
+      alert('Выберите файл');
+      return;
+    }
+
+    const file = fileInput.files[0];
+    const user = auth.currentUser;
+    if (!user) return alert('Войдите в систему');
+
+    const fileRef = storage.ref().child(`documents/${Date.now()}_${file.name}`);
+    try {
+      await fileRef.put(file);
+      const fileUrl = await fileRef.getDownloadURL();
+
+      await db.collection('documents').add({
+        fio,
+        docType,
+        department,
+        status: 'Сканируется',
+        fileName: file.name,
+        fileUrl,
+        createdBy: user.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      e.target.reset();
+      loadDocuments();
+    } catch (error) {
+      alert('Ошибка загрузки: ' + error.message);
+    }
+  });
+
+  async function loadDocuments() {
+    docList.innerHTML = '';
+    const snapshot = await db.collection('documents').orderBy('createdAt', 'desc').get();
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const div = document.createElement('div');
+      div.className = 'doc-item';
+
+      div.innerHTML = `
+        <b>${data.docType} #${doc.id}</b><br>
+        ФИО: ${data.fio}<br>
+        Отдел: ${data.department}<br>
+        Файл: <a href="${data.fileUrl}" target="_blank">${data.fileName}</a><br>
+        Статус: <span id="status-${doc.id}">${data.status}</span><br>
+        <button onclick="updateStatus('${doc.id}', 'Одобрено')">Одобрено</button>
+        <button onclick="updateStatus('${doc.id}', 'Не одобрено')">Не одобрено</button>
+        <div id="qrcode-${doc.id}"></div>
+        <button onclick="generateQR('${doc.id}', '${data.fileUrl}')">Сгенерировать QR-код</button>
+      `;
+
+      docList.appendChild(div);
+    });
+  }
+
+  async function updateStatus(id, status) {
+    const user = auth.currentUser;
+    if (!user) return alert('Войдите в систему');
+
+    try {
+      await db.collection('documents').doc(id).update({
+        status,
+        updatedBy: user.email,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById(`status-${id}`).textContent = status;
+    } catch (e) {
+      alert('Ошибка обновления статуса: ' + e.message);
+    }
+  }
+
+  function generateQR(id, url) {
+    const qrDiv = document.getElementById(`qrcode-${id}`);
+    qrDiv.innerHTML = '';
+    new QRCode(qrDiv, {
+      text: url,
+      width: 128,
+      height: 128
+    });
+  }
+</script>
+
+</body>
+</html>
 
