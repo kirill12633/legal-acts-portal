@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Legal Acts Portal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { max-width: 600px; margin: 20px auto; font-family: Arial; }
+    input, button, select { padding: 8px; margin: 5px 0; width: 100%; }
+    #docs { margin-top: 20px; }
+    .doc { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    .admin-buttons button { margin-right: 5px; }
+  </style>
+</head>
+<body>
+
+  <div id="userInfo"></div>
+  <input id="email" placeholder="Логин (например 12345-12345)" />
+  <input id="password" type="password" placeholder="Пароль" />
+  <button id="loginBtn">Войти</button>
+  <button id="logoutBtn" style="display:none">Выйти</button>
+
+  <section id="uploadSection" style="display:none">
+    <h2>Загрузка документа</h2>
+    <input id="fio" placeholder="ФИО (3 слова)" />
+    <select id="docType">
+      <option value="Постановление">Постановление</option>
+      <option value="Указ">Указ</option>
+    </select>
+    <input id="department" placeholder="Отдел" />
+    <input type="file" id="fileInput" />
+    <button id="uploadBtn">Загрузить документ</button>
+  </section>
+
+  <div id="docs"></div>
+
+  <script type="module">
+    // Твой вставленный код сюда
+  </script>
+
+</body>
+</html>
